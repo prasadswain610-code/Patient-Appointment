@@ -21,7 +21,7 @@ load_dotenv()
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
-MODEL_NAME   = "gemini-2.5-flash"
+MODEL_NAME   = "gemini-3.8-flash"
 CHAT_HISTORY = "gemini_chat_history"
 CHAT_SESSION = "gemini_chat_session"
 
@@ -164,7 +164,7 @@ SUGGESTED_PROMPTS = [
 # ── Render ────────────────────────────────────────────────────────────────────
 
 def render_ai_assistant():
-    st.title("🤖 MediAssist AI — Gemini 2.5 Flash")
+    st.title("🤖 MediAssist AI — Gemini 3.8 Flash")
     st.markdown(
         "Your intelligent healthcare assistant. Ask anything about appointments, "
         "patient risk, scheduling strategy, or clinic analytics."
