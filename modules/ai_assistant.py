@@ -21,7 +21,7 @@ load_dotenv()
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
-MODEL_NAME   = "gemini-2.5-flash-preview-05-20"
+MODEL_NAME   = "gemini-2.5-flash"
 CHAT_HISTORY = "gemini_chat_history"
 CHAT_SESSION = "gemini_chat_session"
 
