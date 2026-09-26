@@ -21,9 +21,10 @@ load_dotenv()
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
-MODEL_NAME   = "gemini-3.8-flash"
-CHAT_HISTORY = "gemini_chat_history"
-CHAT_SESSION = "gemini_chat_session"
+MODEL_NAME      = "gemini-flash-latest"   # primary
+MODEL_FALLBACK  = "gemini-3.8-flash"      # fallback if primary is unavailable
+CHAT_HISTORY    = "gemini_chat_history"
+CHAT_SESSION    = "gemini_chat_session"
 
 SYSTEM_PROMPT = """You are MediAssist AI, a specialized healthcare assistant integrated into a 
 Patient Appointment Management System. You help clinic staff, administrators, and healthcare 
@@ -112,31 +113,10 @@ def _initialize_history():
         st.session_state[CHAT_HISTORY] = []
 
 
-def _send_message(api_key: str, user_message: str) -> str:
-    """Send a message using the google-genai SDK and return the response text."""
-    client = genai.Client(api_key=api_key)
-
-    # Build full conversation history for multi-turn
-    history = st.session_state.get(CHAT_HISTORY, [])
-    contents = []
-
-    for msg in history:
-        role = "user" if msg["role"] == "user" else "model"
-        contents.append(types.Content(
-            role=role,
-            parts=[types.Part(text=msg["content"])]
-        ))
-
-    # Append the new user message with clinic context
-    context = _build_context_summary()
-    full_user_text = f"{context}\n\nUser question: {user_message}"
-    contents.append(types.Content(
-        role="user",
-        parts=[types.Part(text=full_user_text)]
-    ))
-
+def _call_model(client, model: str, contents: list) -> str:
+    """Call a specific model and return response text."""
     response = client.models.generate_content(
-        model=MODEL_NAME,
+        model=model,
         contents=contents,
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
@@ -145,6 +125,46 @@ def _send_message(api_key: str, user_message: str) -> str:
         )
     )
     return response.text
+
+
+def _send_message(api_key: str, user_message: str) -> str:
+    """Send a message with automatic retry and model fallback for 503 errors."""
+    import time
+    client = genai.Client(api_key=api_key)
+
+    # Build conversation history
+    history = st.session_state.get(CHAT_HISTORY, [])
+    contents = []
+    for msg in history:
+        role = "user" if msg["role"] == "user" else "model"
+        contents.append(types.Content(
+            role=role,
+            parts=[types.Part(text=msg["content"])]
+        ))
+
+    context = _build_context_summary()
+    full_user_text = f"{context}\n\nUser question: {user_message}"
+    contents.append(types.Content(
+        role="user",
+        parts=[types.Part(text=full_user_text)]
+    ))
+
+    # Try primary model with 2 retries, then fall back
+    for attempt in range(3):
+        try:
+            return _call_model(client, MODEL_NAME, contents)
+        except Exception as e:
+            err = str(e)
+            if "503" in err or "UNAVAILABLE" in err:
+                if attempt < 2:
+                    time.sleep(2 ** attempt)   # 1s, 2s backoff
+                    continue
+                # Primary exhausted — try fallback
+                try:
+                    return _call_model(client, MODEL_FALLBACK, contents)
+                except Exception as e2:
+                    raise Exception(str(e2)) from None
+            raise   # non-503 errors bubble up immediately
 
 
 # ── Suggested Prompts ─────────────────────────────────────────────────────────
